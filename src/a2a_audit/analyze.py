@@ -86,7 +86,8 @@ def tradeoff(t: pd.DataFrame, path: Path) -> None:
     # pool all attack runs per defence (each attack has the same n)
     pooled = att.groupby("defence")[["success_k", "n"]].sum()
     fig, ax = plt.subplots(figsize=(4.5, 3.6))
-    for d, r in pooled.iterrows():
+    xmin = 1.0
+    for i, (d, r) in enumerate(pooled.iterrows()):
         if d not in ben.index:
             continue
         asr = r.success_k / r.n
@@ -94,14 +95,108 @@ def tradeoff(t: pd.DataFrame, path: Path) -> None:
         use = ben.loc[d, "success_rate"]
         ax.errorbar(use, asr, yerr=[[asr - lo], [hi - asr]],
                     xerr=[[use - ben.loc[d, "ci_lo"]], [ben.loc[d, "ci_hi"] - use]], fmt="o", capsize=3)
-        ax.annotate(d, (use, asr), textcoords="offset points", xytext=(6, 4))
-    ax.set_xlabel("benign task completion")
-    ax.set_ylabel("attack success rate (pooled A1-A5)")
-    ax.set_xlim(0, 1.05)
+        ax.annotate(d, (use, asr), textcoords="offset points", xytext=(-18 if i % 2 else 6, 6))
+        xmin = min(xmin, ben.loc[d, "ci_lo"])
+    ax.set_xlabel("benign task completion (95% CI)")
+    ax.set_ylabel("attack success rate, pooled A1-A5")
+    ax.set_xlim(max(0.0, xmin - 0.05), 1.02)
     ax.set_ylim(0, 1.05)
     ax.set_title("Safety vs usefulness")
     fig.tight_layout()
-    fig.savefig(path)
+    for ext in (".pdf", ".png", ".svg"):
+        fig.savefig(path.with_suffix(ext), dpi=200)
+
+
+def holm(pvals: list[float]) -> list[float]:
+    """Holm-Bonferroni adjusted p-values (same order as input)."""
+    m = len(pvals)
+    order = sorted(range(m), key=lambda i: pvals[i])
+    adj, running = [0.0] * m, 0.0
+    for rank, i in enumerate(order):
+        running = max(running, min(1.0, (m - rank) * pvals[i]))
+        adj[i] = running
+    return adj
+
+
+def newcombe_diff(k1: int, n1: int, k2: int, n2: int) -> tuple[float, float, float]:
+    """Difference p1 - p2 with Newcombe's hybrid-score 95% CI (method 10)."""
+    p1, p2 = k1 / n1, k2 / n2
+    l1, u1 = wilson(k1, n1)
+    l2, u2 = wilson(k2, n2)
+    d = p1 - p2
+    lo = d - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
+    hi = d + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
+    return d, lo, hi
+
+
+def prereg_tests(df: pd.DataFrame) -> str:
+    """The tests pre-registered in docs/PREREG.md, computed from run summaries only."""
+    v = df[df["success"].notna()].copy()
+    v["success"] = v["success"].astype(bool)
+
+    def counts(mask) -> tuple[int, int]:
+        sub = v[mask]
+        return int(sub["success"].sum()), len(sub)
+
+    def cell(attack, defence):
+        return counts((v["attack"] == attack) & (v["defence"] == defence))
+
+    out = [f"runs with a valid outcome: {len(v)} / {len(df)} (errors: {len(df) - len(v)})", ""]
+    out.append("PRIMARY FAMILY: D1 vs D3 per attack, two-sided Fisher exact, Holm-corrected")
+    attacks = ["A1", "A2", "A3", "A4", "A5"]
+    raw = []
+    for a in attacks:
+        (k1, n1), (k3, n3) = cell(a, "D1"), cell(a, "D3")
+        raw.append(fisher_exact(k1, n1, k3, n3) if n1 and n3 else float("nan"))
+    adj = holm(raw)
+    for a, p, pa in zip(attacks, raw, adj):
+        (k1, n1), (k3, n3) = cell(a, "D1"), cell(a, "D3")
+        out.append(f"  {a}: D1 {k1}/{n1}  D3 {k3}/{n3}  p={p:.4g}  p_holm={pa:.4g}")
+    out += ["", "H1: A1, A5: D0 vs D1 (prediction: D1 not lower)"]
+    for a in ("A1", "A5"):
+        (k0, n0), (k1, n1) = cell(a, "D0"), cell(a, "D1")
+        out.append(f"  {a}: D0 {k0}/{n0}  D1 {k1}/{n1}  p={fisher_exact(k0, n0, k1, n1):.4g}")
+    k3, n3 = cell("A3", "D3")
+    lo, hi = wilson(k3, n3)
+    out += ["", f"H4: A3 under D3: {k3}/{n3} = {k3 / n3:.3f} (95% CI {lo:.3f}-{hi:.3f}); prediction: > 0"]
+    m2 = (v["attack"].isin(["A1", "A2", "A5"])) & (v["defence"] == "D2")
+    m3 = (v["attack"].isin(["A1", "A2", "A5"])) & (v["defence"] == "D3")
+    (k2, n2), (k3, n3) = counts(m2), counts(m3)
+    out += ["", f"H5: pooled A1+A2+A5: D2 {k2}/{n2}  D3 {k3}/{n3}  p={fisher_exact(k2, n2, k3, n3):.4g} (prediction: D2 higher)"]
+    (b1, m1), (b3, mm3) = counts((v["type"] == "benign") & (v["defence"] == "D1")), counts(
+        (v["type"] == "benign") & (v["defence"] == "D3"))
+    d, dlo, dhi = newcombe_diff(b1, m1, b3, mm3)
+    out += ["", f"H6: benign completion D1 {b1}/{m1}  D3 {b3}/{mm3}; D1-D3 = {d:.3f} (95% CI {dlo:.3f} to {dhi:.3f}); "
+                "prediction: difference <= 0.10"]
+    out += ["", "ROBUSTNESS: per variant (pooled over seeds), D3 ASR lower / equal / higher than D1"]
+    for a in attacks:
+        sub = v[v["attack"] == a]
+        r = sub.groupby(["variant", "defence"])["success"].mean().unstack()
+        if {"D1", "D3"} <= set(r.columns):
+            lower = int((r["D3"] < r["D1"]).sum())
+            equal = int((r["D3"] == r["D1"]).sum())
+            higher = int((r["D3"] > r["D1"]).sum())
+            out.append(f"  {a}: lower {lower}, equal {equal}, higher {higher} (of {len(r)} variants)")
+    return "\n".join(out)
+
+
+def markdown_table(t: pd.DataFrame) -> str:
+    """Table 1 for the report: k/n (rate, 95% CI) per group x defence. Generated, never typed by hand."""
+    defences = sorted(t["defence"].unique())
+    groups = [g for g in sorted(t["group"].unique()) if g != "benign"] + ["benign"]
+    lines = ["| | " + " | ".join(defences) + " |", "|---|" + "---|" * len(defences)]
+    for g in groups:
+        cells = []
+        for d in defences:
+            r = t[(t["group"] == g) & (t["defence"] == d)]
+            if r.empty:
+                cells.append("")
+                continue
+            r = r.iloc[0]
+            cells.append(f"{int(r.success_k)}/{int(r.n)} ({r.success_rate:.2f}; {r.ci_lo:.2f}–{r.ci_hi:.2f})")
+        label = "benign completion" if g == "benign" else f"{g} ASR"
+        lines.append(f"| {label} | " + " | ".join(cells) + " |")
+    return "\n".join(lines)
 
 
 def heatmap(t: pd.DataFrame, path: Path) -> None:
@@ -113,19 +208,21 @@ def heatmap(t: pd.DataFrame, path: Path) -> None:
     a = t[t["group"] != "benign"].pivot_table(index="group", columns="defence", values="success_rate")
     if a.empty:
         return
-    fig, ax = plt.subplots(figsize=(1.2 * a.shape[1] + 2, 0.6 * a.shape[0] + 1.5))
-    im = ax.imshow(a.values, vmin=0, vmax=1, cmap="Reds")
+    fig, ax = plt.subplots(figsize=(0.9 * a.shape[1] + 1.6, 0.5 * a.shape[0] + 1.2))
+    im = ax.imshow(a.values, vmin=0, vmax=1, cmap="Reds", aspect="auto")
     ax.set_xticks(range(a.shape[1]), a.columns)
     ax.set_yticks(range(a.shape[0]), a.index)
     for i in range(a.shape[0]):
         for j in range(a.shape[1]):
             v = a.values[i, j]
             if not math.isnan(v):
-                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=10)
-    ax.set_title("Attack success rate")
+                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=10,
+                        color="white" if v > 0.6 else "black")
+    ax.set_title("Attack success rate (n=30 per cell)")
     fig.colorbar(im, ax=ax, fraction=0.046)
     fig.tight_layout()
-    fig.savefig(path)
+    for ext in (".pdf", ".png", ".svg"):
+        fig.savefig(path.with_suffix(ext), dpi=200)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -139,12 +236,19 @@ def main(argv: list[str] | None = None) -> None:
         return
     t = table(df)
     t.to_csv(d / "summary.csv", index=False)
+    runs = df.sort_values("run_id")[["scenario", "variant", "defence", "seed", "success", "n_blocks", "llm_calls",
+                                      "cost_usd", "error"]].copy()
+    runs["success"] = runs["success"].map({True: 1, False: 0})
+    runs.to_csv(d / "runs.csv", index=False, float_format="%.3g")  # one row per run, committed to git
     (d / "summary.txt").write_text(t.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
     heatmap(t, d / "asr_heatmap.pdf")
     tradeoff(t, d / "tradeoff.pdf")
     c = compare(t, [("D0", "D1"), ("D1", "D2"), ("D1", "D3"), ("D2", "D3"), ("D3", "D4")])
     c.to_csv(d / "comparisons.csv", index=False)
     (d / "comparisons.txt").write_text(c.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
+    (d / "table1.md").write_text(markdown_table(t) + "\n")
+    if {"A1", "D1", "D3"} <= set(df["attack"].dropna()) | set(df["defence"]):
+        (d / "prereg_tests.txt").write_text(prereg_tests(df))
     print(t.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
 
 

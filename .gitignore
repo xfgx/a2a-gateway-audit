@@ -10,3 +10,7 @@ results/tmp/
 .DS_Store
 uv.lock
 results/smoke*/
+# per-run raw logs are archived separately (too large for the repo); aggregated files are committed
+results/*/*__*/
+results/*/runs.jsonl
+results/pilot_s9/
