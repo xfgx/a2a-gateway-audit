@@ -1,0 +1,13 @@
+ group             model  a  b  rate_a  rate_b  p_fisher
+    A1 deepseek-v4-flash D3 D5   0.000   0.000     1.000
+    A1 deepseek-v4-flash D3 D6   0.000   0.000     1.000
+    A2 deepseek-v4-flash D3 D5   0.000   0.000     1.000
+    A2 deepseek-v4-flash D3 D6   0.000   0.000     1.000
+    A3 deepseek-v4-flash D3 D5   1.000   0.000     0.000
+    A3 deepseek-v4-flash D3 D6   1.000   0.000     0.000
+    A4 deepseek-v4-flash D3 D5   0.600   0.000     0.000
+    A4 deepseek-v4-flash D3 D6   0.600   0.000     0.000
+    A5 deepseek-v4-flash D3 D5   0.000   0.000     1.000
+    A5 deepseek-v4-flash D3 D6   0.000   0.000     1.000
+benign deepseek-v4-flash D3 D5   0.944   0.944     1.000
+benign deepseek-v4-flash D3 D6   0.944   0.944     1.000
