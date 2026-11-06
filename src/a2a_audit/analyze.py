@@ -183,7 +183,8 @@ def prereg_tests(df: pd.DataFrame) -> str:
 def markdown_table(t: pd.DataFrame) -> str:
     """Table 1 for the report: k/n (rate, 95% CI) per group x defence. Generated, never typed by hand."""
     defences = sorted(t["defence"].unique())
-    groups = [g for g in sorted(t["group"].unique()) if g != "benign"] + ["benign"]
+    present = set(t["group"].unique())
+    groups = sorted(present - {"benign"}) + (["benign"] if "benign" in present else [])
     lines = ["| | " + " | ".join(defences) + " |", "|---|" + "---|" * len(defences)]
     for g in groups:
         cells = []
@@ -243,7 +244,7 @@ def main(argv: list[str] | None = None) -> None:
     (d / "summary.txt").write_text(t.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
     heatmap(t, d / "asr_heatmap.pdf")
     tradeoff(t, d / "tradeoff.pdf")
-    c = compare(t, [("D0", "D1"), ("D1", "D2"), ("D1", "D3"), ("D2", "D3"), ("D3", "D4")])
+    c = compare(t, [("D0", "D1"), ("D1", "D2"), ("D1", "D3"), ("D2", "D3"), ("D3", "D4"), ("D3", "D5"), ("D3", "D6")])
     c.to_csv(d / "comparisons.csv", index=False)
     (d / "comparisons.txt").write_text(c.to_string(index=False, float_format=lambda x: f"{x:.3f}"))
     (d / "table1.md").write_text(markdown_table(t) + "\n")

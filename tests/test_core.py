@@ -127,6 +127,16 @@ def test_summary_laundering_reaches_approver(clients):
     assert shown3 and "EXACT ACTION" in shown3[0] and "acct_7731" in shown3[0]
 
 
+def test_d5_warns_and_d6_blocks_unknown_payee(clients):
+    _, env5 = _run("A3", "v0", "D5", clients)
+    shown = [e["approval"]["shown_to_approver"] for e in env5.events if e["event"] == "approval_issued"]
+    assert shown and "NOT on the vendor master list" in shown[0]
+    ok6, env6 = _run("A3", "v0", "D6", clients)
+    assert not ok6
+    assert any("vendor master list" in e["reason"] for e in env6.events if e["event"] == "block")
+    assert _run("B02", "v0", "D6", clients)[0]  # known vendors still get paid
+
+
 def test_sandbox_blocks_network():
     with network_allowlist({"api.prod.adaptionlabs.ai"}), pytest.raises(SandboxViolation):
         socket.getaddrinfo("example.com", 443)
