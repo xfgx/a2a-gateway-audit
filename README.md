@@ -1,51 +1,56 @@
 # a2a-gateway-audit
 
-**Approval laundering and delegation privilege escalation in agent-to-agent (A2A) networks — attacks, a provenance-tracking gateway defence, and measurements.**
+**Approval laundering and delegation privilege escalation in agent-to-agent (A2A) networks: attacks, a provenance-tracking gateway defence, and measurements.**
 
-Submission for the [Swarm Alignment Hackathon 2026](https://apartresearch.com/sprints/swarm-alignment-2026) (Apart Research), **Track 3 — Strengthening Agent Infrastructure** (cross-track: Track 4, oversight & control).
+Submission for the [Swarm Alignment Hackathon 2026](https://apartresearch.com/sprints/swarm-alignment-2026) (Apart Research), **Track 3: Strengthening Agent Infrastructure** (cross-track with Track 4, oversight & control).
 
-> **Status:** pre-sprint planning. This repository currently contains **only planning documents, no code**. See [Sprint disclosure](#sprint-disclosure).
+> **Status:** sprint starting. This repository has **planning documents and dependency configuration only, no implementation code yet**. See [Sprint disclosure](#sprint-disclosure).
 
 ## Question in one sentence
 
-When agents delegate work to each other through a gateway, can an attacker get a harmful tool call executed by *laundering* it through approvals or higher-privileged agents — and how much does a gateway that tracks **who originally asked** and **what exactly was approved** reduce that, compared with per-hop ACLs and an LLM judge?
+When agents delegate work to each other through a gateway, can an attacker get a harmful tool call executed by *laundering* it through approvals or higher-privileged agents? And how much does a gateway that tracks **who originally asked** and **what exactly was approved** reduce that, compared with per-hop ACLs and an LLM judge?
 
-Full plan: [`docs/RESEARCH_PLAN.md`](docs/RESEARCH_PLAN.md).
+- Research plan: [`docs/RESEARCH_PLAN.md`](docs/RESEARCH_PLAN.md)
+- Technical plan: [`docs/TECH_PLAN.md`](docs/TECH_PLAN.md)
+- Integrity rules: [`CLAUDE.md`](CLAUDE.md)
+- References (with verification status): [`docs/REFERENCES.md`](docs/REFERENCES.md)
 
-## Repository layout (planned)
+## Setup
 
-```
-docs/          research plan, threat model, sprint log
-env/           multi-agent sandbox: agents, mock tools, message bus      (sprint)
-gateway/       defences D1–D4                                             (sprint)
-attacks/       attack scenarios A1–A5                                     (sprint)
-scenarios/     benign + attack task suites (JSON)                         (sprint)
-experiments/   run configs, scripts, analysis notebooks                   (sprint)
-results/       raw JSONL logs + aggregated tables/figures                 (sprint)
-report/        PDF report on the official Apart template                  (sprint)
+```bash
+uv sync                      # Python 3.11 (exact pins: requirements.lock.txt)
+cp .env.example .env         # add an OpenAI-compatible endpoint + key
+uv run pytest                # (once code exists)
 ```
 
-## Reproducibility (target)
+## Layout (planned)
 
-- Every message, tool call, gateway decision and model response is logged as JSONL with a run seed.
-- Mock tools are deterministic; no real network, filesystem or payment side effects (sandbox containment is part of the evaluation).
-- One command re-runs any experiment from its config.
+```
+src/a2a_audit/   schema, A2A wire adapter, LLM client, mock tools, agents, bus, gateway/ (D0–D4), harness, analysis
+scenarios/       benign + attack suites (YAML)
+experiments/     run configs
+results/         raw JSONL logs + aggregated tables/figures
+report/          report draft, tables, figures (final text goes into the official Google Doc template)
+tests/
+```
 
 ## Sprint disclosure
 
-Only work done during the sprint is judged. We track provenance explicitly:
+Only work done during the sprint is judged. Provenance:
 
 | Item | When | Status |
 |---|---|---|
-| `README.md`, `docs/RESEARCH_PLAN.md`, `docs/SPRINT_LOG.md` (planning only, no code) | Thu 5 Nov 2026, before sprint start | **pre-sprint (planning)** |
-| All code in `env/`, `gateway/`, `attacks/`, `scenarios/`, `experiments/`, `results/`, `report/` | during the sprint | sprint work |
+| `README.md`, `CLAUDE.md`, `docs/*` (planning, no code) | 5–6 Nov 2026, before sprint start | **pre-sprint (planning)** |
+| `pyproject.toml`, `requirements.lock.txt`, `.gitignore`, `.env.example` (dependency config, no logic) | 6 Nov 2026, before sprint start | **pre-sprint (config)** |
+| Report template | [official Google Doc](https://docs.google.com/document/d/1_1_27EyZriMlc8n8EBE2YScaeyMjm-8xjR097nmHXAE/copy?usp=sharing) (not stored in repo) | third-party (Apart Research) |
+| Everything in `src/`, `scenarios/`, `experiments/`, `results/`, `tests/`, report text | during the sprint | sprint work |
 
-No code from other projects is reused. If any third-party library or preexisting code is used, it will be listed in [`docs/SPRINT_LOG.md`](docs/SPRINT_LOG.md) and marked **preexisting** here and in the report.
+No code from other projects is reused. Third-party libraries are listed in `pyproject.toml` and [`docs/SPRINT_LOG.md`](docs/SPRINT_LOG.md).
 
 ## AI assistance
 
-AI tools were used for planning and will be used for coding and writing. The team reviewed and is responsible for all content; all reported numbers come from logged runs in `results/`.
+An AI assistant (Claude) is used for planning, coding and drafting. The team reviews and is responsible for all content. Every reported number comes from logged runs in `results/`. See [`CLAUDE.md`](CLAUDE.md) for the rules we follow.
 
 ## License
 
-TBD (MIT planned) — to be added during the sprint.
+MIT (to be added).

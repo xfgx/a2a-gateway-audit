@@ -6,4 +6,6 @@ venv/
 *.egg-info/
 .ipynb_checkpoints/
 results/tmp/
+.cache/
 .DS_Store
+uv.lock
