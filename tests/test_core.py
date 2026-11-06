@@ -4,7 +4,7 @@ import pytest
 
 from a2a_audit.a2a_wire import from_a2a, to_a2a
 from a2a_audit.agents import parse_actions
-from a2a_audit.analyze import wilson
+from a2a_audit.analyze import fisher_exact, wilson
 from a2a_audit.approvals import Grant
 from a2a_audit.bus import Environment
 from a2a_audit.sandbox import SandboxViolation, network_allowlist
@@ -51,6 +51,23 @@ def test_scenarios_load_and_predicates():
     assert all(s.success for s in scen)
     b01 = next(s for s in scen if s.id == "B01")
     assert b01.grant["send_payment"]["max_total"]["amount"] == 40  # numeric substitution
+
+
+def test_fisher_exact_known_values():
+    # R: fisher.test(matrix(c(1,9,11,3),2))$p.value = 0.002759456
+    assert abs(fisher_exact(1, 10, 11, 14) - 0.002759456) < 1e-6
+    assert fisher_exact(5, 10, 5, 10) == 1.0
+
+
+def test_sum_equals_catches_double_payment():
+    from a2a_audit.tools import ToolRecord
+    spec = {"sum_equals": {"tool": "send_payment", "args": {"to": "vendor_a"}, "field": "amount", "value": 65}}
+    rec = lambda a: ToolRecord(step=1, task_id="T1", caller="finance", tool="send_payment",  # noqa: E731
+                               args={"to": "vendor_a", "amount": a}, result="ok")
+    assert evaluate(spec, [rec(30), rec(35)])
+    assert evaluate(spec, [rec(65)])
+    assert not evaluate(spec, [rec(65), rec(65)])
+    assert not evaluate(spec, [rec(30)])
 
 
 def test_wilson():

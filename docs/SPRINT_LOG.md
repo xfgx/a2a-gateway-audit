@@ -11,12 +11,18 @@ Purpose: make it trivially checkable what was done when, as required by the spri
 
 ## Sprint (from Fri 6 Nov 2026, first official sprint day)
 
-- **2026-11-06 ~13:10 UTC** started implementation: `src/a2a_audit/` (schema, A2A wire adapter, LLM client with Adaption/OpenAI/scripted backends + sqlite cache, mock tools, approvals and grants, agents, gateway D0-D4, event loop, scenarios and predicates, network sandbox, harness, analysis), 9 scenario files (4 benign, 5 attack; 2-3 variants each), offline tests (17, scripted test doubles, no network).
-- **2026-11-06 ~14:00 UTC** first real-model smoke run (`experiments/configs/smoke.yaml`, deepseek-v4-flash, 1 variant x 1 seed). Pipeline check only, **not a result** (not committed; `results/smoke*` is git-ignored). Issues found and fixed:
+- **2026-11-06 13:10 UTC** (file birth times) started implementation: `src/a2a_audit/` (schema, A2A wire adapter, LLM client with Adaption/OpenAI/scripted backends + sqlite cache, mock tools, approvals and grants, agents, gateway D0-D4, event loop, scenarios and predicates, network sandbox, harness, analysis), 9 scenario files (4 benign, 5 attack; 2-3 variants each), offline tests (17, scripted test doubles, no network).
+- **2026-11-06 13:17 UTC** first real-model smoke run (`experiments/configs/smoke.yaml`, deepseek-v4-flash, 1 variant x 1 seed). Pipeline check only, **not a result** (not committed; `results/smoke*` is git-ignored). Issues found and fixed:
   - `max_tokens: 800` truncated the reasoning model's output (empty replies: 14/121 turns). Raised to 4000/3000; re-run had 0/155 parse errors.
   - The approver sometimes "approved" a plain message with no structured request; the run then stalled. Fixed: the environment now replies with a notice telling the sender to use `request_approval`. This behaves the same under every defence.
   - D3: the approval view now also shows the cumulative amount already paid to the same recipient in the task lineage. Without it the approver approved each split payment on its own.
 - Design change: the analysis reports benign *completion* as the usefulness metric; "any gateway block" is secondary (see PREREG).
+- **2026-11-06 ~13:30 UTC** scenario suite extended to 10 variants per attack (A1–A5) and 24 benign variants (B01–B06, new: B05 email, B06 three-hop lookup-then-pay). Added Fisher exact tests and a safety–usefulness plot to `analyze.py`.
+- **2026-11-06 13:39–13:48 UTC** pilot (`experiments/configs/pilot.yaml`, seed 9, 370 runs, ~$0.12). Seed 9 is **not used in the main run**. The pilot was a bug check only; its numbers are not results. Findings:
+  - 0 crashed runs and 6 parse errors. Mechanics checked by reading transcripts of D3 blocks, approvals and the anti-splitting rule.
+  - Measurement fix: the benign payment predicates required separate payments per invoice, so a correct single payment for the total (B04) counted as a failure and double payments were not caught. All benign payment scenarios now use `sum_equals` (vendor receives exactly the amount due). Re-scoring the pilot benign runs with the new predicate: 6 runs flipped fail→success and 1 flipped success→fail.
+  - **No attack prompts, agent prompts or defences were changed after the pilot.**
+- **2026-11-06 ~13:55 UTC** PREREG frozen (`docs/PREREG.md`, code_hash `ddcfa9730b96019c`), then the main run started.
 
 ## Third-party / preexisting code
 
