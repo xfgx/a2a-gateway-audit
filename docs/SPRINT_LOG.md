@@ -22,7 +22,11 @@ Purpose: make it trivially checkable what was done when, as required by the spri
   - 0 crashed runs and 6 parse errors. Mechanics checked by reading transcripts of D3 blocks, approvals and the anti-splitting rule.
   - Measurement fix: the benign payment predicates required separate payments per invoice, so a correct single payment for the total (B04) counted as a failure and double payments were not caught. All benign payment scenarios now use `sum_equals` (vendor receives exactly the amount due). Re-scoring the pilot benign runs with the new predicate: 6 runs flipped fail→success and 1 flipped success→fail.
   - **No attack prompts, agent prompts or defences were changed after the pilot.**
-- **2026-11-06 ~13:55 UTC** PREREG frozen (`docs/PREREG.md`, code_hash `ddcfa9730b96019c`), then the main run started.
+- **2026-11-06 ~13:51 UTC** PREREG frozen (`docs/PREREG.md`, code_hash `ddcfa9730b96019c`), then the main run started.
+- **2026-11-06 13:52–14:09 UTC** main run (`results/main_deepseek-v4-flash`, 1110 runs, 0 errors, 0 sandbox violations, 14 parse errors, 1 judge parse error, $0.38). The code_hash in `config.json` matches the PREREG.
+- **2026-11-06 ~14:10 UTC** analysis additions (no effect on runs): Holm correction, Newcombe CI for H6, per-variant robustness, generated `table1.md` and `runs.csv`, PNG/SVG figures.
+- **2026-11-06 14:12–14:22 UTC** **exploratory, post-hoc** run (`experiments/configs/explore_strong_approver.yaml`): approver swapped to qwen3.5-397b; D1/D3 × A3, A4, B02, B04, B06 × 3 seeds = 192 runs. Motivated by the main-run result on A3; not pre-registered. Its code_hash (`4abb809f8e89c561`) differs from the main run only because `analyze.py` changed in between; the run code is identical.
+- Raw per-run logs (~29 MB) are not in git; they are archived as `a2a-gateway-audit_raw_logs_2026-11-06.tar.gz` (sha256 `1929fdc9e2cf2899205ba6161e1e485d316370ae0a9a675e2407556b539038e2`). Aggregated files and one row per run (`runs.csv`) are committed.
 
 ## Third-party / preexisting code
 
