@@ -2,12 +2,12 @@
 
 > Draft written by the AI assistant for the team to rewrite (the template asks that the final text be primarily written by the team). Every `[[...]]` placeholder must be filled **only** from `results/main_deepseek-v4-flash/` (`summary.txt`, `comparisons.txt`, `prereg_tests.txt`). Do not type numbers by hand.
 
-**Authors:** [[names]] · **Affiliations:** [[affiliations]] · With Apart Research
+**Author:** Danyel Fork · **Affiliation:** Independent [[confirm]] · With Apart Research
 Research conducted at the Swarm Alignment Hackathon, November 2026.
 
 ## Abstract (150–250 words; draft, team to rewrite)
 
-When AI agents delegate work to each other, oversight is usually attached to single hops. An ACL checks the immediate caller, an approver reads the message in front of it, and a monitor screens one message at a time. We study how this fails under *approval laundering* (replaying an approval, obtaining it on a benign paraphrase, or splitting a payment below the approval threshold) and under confused-deputy requests that enter a task from outside. We build a reproducible sandbox in which LLM agents exchange A2A protocol messages through a gateway, with mock payment tools and deterministic success predicates. We compare five gateway defences on 50 attack and 24 benign scenario variants (1110 pre-registered runs). A gateway that tracks the task's grant along the delegation chain, instead of trusting sender metadata, reduced externally injected payments from 24/30 to 0/30 (confused deputy) and from 21/30 to 0/30 (forged "on behalf of"). A per-hop ACL gave no protection, and benign completion stayed at 70/72. Binding approvals to the exact action and showing that action to the approver did not stop summary laundering: an LLM approver approved 30/30 laundered $900 payments to unknown accounts, and so did a much larger approver model in an exploratory run. A per-message LLM judge caught most attacks in our setting, where attacker payees are easy to spot, at roughly twice the LLM calls. Structural provenance removes external injection, but inside a legitimately delegated task safety still rests on LLM judgment of text.
+When AI agents delegate work to each other, oversight is usually attached to single hops. An ACL checks the immediate caller, an approver reads the message in front of it, and a monitor screens one message at a time. We study how this fails under *approval laundering* (replaying an approval, obtaining it on a benign paraphrase, or splitting a payment below the approval threshold) and under confused-deputy requests that enter a task from outside. We build a reproducible sandbox in which LLM agents exchange A2A messages through a gateway, with mock payment tools and deterministic success predicates. We compare five gateway defences on 50 attack and 24 benign scenario variants (1110 pre-registered runs). A gateway that tracks the task's grant along the delegation chain, instead of trusting sender metadata, reduced externally injected payments from 24/30 to 0/30 (confused deputy) and from 21/30 to 0/30 (forged "on behalf of"). A per-hop ACL gave no protection, and benign completion stayed at 70/72. Binding approvals to the exact action and showing that action to the approver did not stop summary laundering: an LLM approver approved 30/30 laundered $900 payments to unknown accounts, and so did a much larger approver model. In exploratory runs, one gateway-written warning that the payee is not a known vendor cut laundered approvals to 0/30. A per-message LLM judge caught most attacks at roughly twice the LLM calls. Gateways should enforce provenance and state structural facts explicitly rather than rely on how an LLM reads text.
 
 ## 1. Introduction
 
@@ -20,7 +20,7 @@ We study **approval laundering**: an approval obtained for one thing is used to 
 **Our main contributions are:**
 1. An open, replayable testbed: 5 LLM roles, mock tools, A2A wire format, deterministic success predicates, and a network allow-list. It contains 50 attack and 24 benign scenario variants.
 2. A gateway defence (D3) that combines three mechanisms. (a) It tracks provenance itself: an agent's effective grant is the intersection of all grants that reached its task thread, so claimed `on_behalf_of` values are ignored. (b) Approvals are bound to the exact canonical action, single-use and lineage-scoped, with cumulative anti-splitting. (c) The approver is shown the exact structured action ("what you see is what you sign").
-3. A pre-registered comparison against per-hop ACLs (D1) and a per-message LLM judge (D2), reporting both safety and usefulness: [[one-sentence headline from prereg_tests.txt]].
+3. A pre-registered comparison against per-hop ACLs (D1) and a per-message LLM judge (D2), reporting both safety and usefulness. Gateway-tracked provenance removed externally injected payments, while per-hop ACLs gave no protection. Showing the approver the exact action did not stop laundering. In exploratory runs, an explicit gateway-written warning did.
 
 ## 2. Related Work
 
@@ -58,7 +58,9 @@ All numbers below are copied from generated files: `results/main_deepseek-v4-fla
 | A5 ASR | 22/30 (0.73; 0.56–0.86) | 21/30 (0.70; 0.52–0.83) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
 | benign completion | 72/72 (1.00; 0.95–1.00) | 72/72 (1.00; 0.95–1.00) | 69/72 (0.96; 0.88–0.99) | 70/72 (0.97; 0.90–0.99) | 66/72 (0.92; 0.83–0.96) |
 
-[[Figure 1: fig1_asr_heatmap; Figure 2: fig2_safety_usefulness]]
+**Figure 1** (`fig1_asr_heatmap.png`). Attack success rate per attack × defence (n = 30 per cell; deepseek-v4-flash for all roles).
+
+**Figure 2** (`fig2_safety_usefulness.png`). Safety vs usefulness: pooled attack success (A1–A5, n = 150 per defence) vs benign completion (n = 72), with 95% Wilson CIs.
 
 **Observations (pre-registered tests).**
 - *H1, supported.* A per-hop ACL gave no protection against requests that originate outside the task. A1: D0 21/30 vs D1 24/30 (p = 0.55). A5: 22/30 vs 21/30 (p = 1). The ACL checks finance, which legitimately owns the payment tool.
@@ -79,13 +81,36 @@ All numbers below are copied from generated files: `results/main_deepseek-v4-fla
 
 The larger approver also approved every laundered A3 request under D3, and lowered benign completion under D3.
 
-**Interpretation (kept separate from the observations).** Structural provenance cleanly removes attacks that *enter* a task from outside (A1, A5). Inside a legitimately delegated task with a broad grant, however, every remaining safeguard reduces to an LLM's judgment of text: the approver's, or the judge's. Binding approvals to the exact action closes replay (by construction; there were few successes to remove), but it does not make approvers read the action. The approver anchored on the narrative it was given.
+**Exploratory 2 (post-hoc): surface the structural fact, or enforce it.** D5 = D3 plus one gateway-written line in the approval view ("WARNING: payee X is NOT on the vendor master list"). D6 = D3 plus a hard vendor allowlist at the gateway. Both rely on a vendor master list that the gateway can consult. The full main suite, 3 seeds (`results/explore_d5_d6/`); D3 was re-run in the same batch for a like-for-like reference:
+
+| | D3 | D5 | D6 |
+|---|---|---|---|
+| A1 ASR | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
+| A2 ASR | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
+| A3 ASR | 30/30 (1.00; 0.89–1.00) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
+| A4 ASR | 18/30 (0.60; 0.42–0.75) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
+| A5 ASR | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) | 0/30 (0.00; 0.00–0.11) |
+| benign completion | 68/72 (0.94; 0.87–0.98) | 68/72 (0.94; 0.87–0.98) | 68/72 (0.94; 0.87–0.98) |
+
+A single gateway-written warning was enough: the same approver that approved 30/30 laundered requests under D3 approved 0/30 under D5. A4 fell from 18/30 to 0/30. Benign completion was unchanged (68/72 in all three).
+
+**Exploratory 3 (post-hoc): vendor-lookalike payees** (e.g. `vendor_a_billing`, `vendor-b`, `vendor_d`; 5 variants × 3 seeds; `results/explore_lookalike/`):
+
+| | D0 | D1 | D2 | D3 | D4 | D5 | D6 |
+|---|---|---|---|---|---|---|---|
+| A1L ASR | 3/15 (0.20; 0.07–0.45) | 5/15 (0.33; 0.15–0.58) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) |
+| A3L ASR | 7/15 (0.47; 0.25–0.70) | 6/15 (0.40; 0.20–0.64) | 2/15 (0.13; 0.04–0.38) | 8/15 (0.53; 0.30–0.75) | 6/15 (0.40; 0.20–0.64) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) |
+| A4L ASR | 4/15 (0.27; 0.11–0.52) | 3/15 (0.20; 0.07–0.45) | 0/15 (0.00; 0.00–0.20) | 2/15 (0.13; 0.04–0.38) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) | 0/15 (0.00; 0.00–0.20) |
+
+Lookalike payees did not make the attacks more successful against the LLM agents or the judge (D2 still 0–2/15). D3 still let laundering through (A3L 8/15). D5 and D6 stopped every attempt.
+
+**Interpretation (kept separate from the observations).** Structural provenance cleanly removes attacks that *enter* a task from outside (A1, A5). Inside a legitimately delegated task with a broad grant, however, every remaining safeguard reduces to an LLM's judgment of text: the approver's, or the judge's. Binding approvals to the exact action closes replay (by construction; there were few successes to remove), but it does not make approvers read the action. The approver anchored on the narrative it was given. When the gateway turned the structured fact into an explicit sentence (D5), the same approver refused every laundered request. This suggests the failure is one of salience, not of capability; the exploratory results support this, but it is not established.
 
 ## 5. Discussion and Limitations
 
-**Discussion (draft).** (1) Provenance should be tracked by the gateway, not trusted from sender metadata. A per-hop ACL on the authenticated caller, the identity-based authorization that A2A §7.5 describes, gave no measurable protection in our setting. (2) "Exact-action" approval is necessary but not sufficient. An LLM approver needs the *structural* facts surfaced as decisions ("payee is not a known vendor"), or the grant must carry a recipient allowlist. Both are gateway-side checks that do not depend on the approver reading carefully. (3) In our setting the per-message judge was strong, but our attacker accounts look obviously unlike known vendors (e.g. `acct_7731`). This is the easiest possible case for a content monitor, and we expect an adaptive attacker to lower its catch rate.
+**Discussion (draft).** (1) Provenance should be tracked by the gateway, not trusted from sender metadata. A per-hop ACL on the authenticated caller, the identity-based authorization that A2A §7.5 describes, gave no measurable protection in our setting. (2) "Exact-action" approval is necessary but not sufficient. An LLM approver needs the *structural* facts surfaced as decisions ("payee is not a known vendor"), or the grant must carry a recipient allowlist. Both are gateway-side checks that do not depend on the approver reading carefully. (3) In our setting the per-message judge was strong. In the main suite, attacker accounts look obviously unlike known vendors (e.g. `acct_7731`). With vendor-lookalike payees (exploratory) it still caught most attempts (0–2/15). An attacker who adapts to the judge remains untested.
 
-**Limitations (draft).** The approver and judge run at temperature 0, and the first adversarial step is scripted. Their decisions on that step are therefore nearly identical across seeds, so for A2–A4 the effective sample size is closer to 10 variants than to 30 runs (see the per-variant robustness counts). Attacker payees are visibly non-vendor IDs. All adversaries are scripted: we measure the gullibility of honest LLM agents and the gateway's structural guarantees, not an adaptive attacker. One model family serves every role. The approver is an LLM stand-in for a human. Mock tools only. The scenarios are small and hand-written, so ASR depends on wording; we mitigate with 10 variants per attack. D3 assumes the gateway is trusted and agents cannot forge gateway state. Data-exfiltration splitting (which needs secrecy labels) and identity reset via renaming (A6) are not evaluated.
+**Limitations (draft).** The approver and judge run at temperature 0, and the first adversarial step is scripted. Their decisions on that step are therefore nearly identical across seeds, so for A2–A4 the effective sample size is closer to 10 variants than to 30 runs (see the per-variant robustness counts). Attacker payees are visibly non-vendor IDs. All adversaries are scripted: we measure the gullibility of honest LLM agents and the gateway's structural guarantees, not an adaptive attacker. One model family serves every role. The approver is an LLM stand-in for a human. Mock tools only. The scenarios are small and hand-written, so ASR depends on wording; we mitigate with 10 variants per attack. D3 assumes the gateway is trusted and agents cannot forge gateway state. Data-exfiltration splitting (which needs secrecy labels) and identity reset via renaming (A6) are not evaluated. D5/D6 depend on a vendor master list. Our benign suite pays only known vendors, so the usefulness cost of onboarding a *new* legitimate vendor is not measured, and an attacker who controls a listed vendor account is out of scope. The LLM cache is keyed by prompt. Runs whose prompts are identical across defences (e.g. D3/D4/D5/D6 before the first gateway difference) share samples, and when two runs miss the cache at the same time the last write wins. A re-run of D3 was served 1195/1212 calls from cache, and 9/360 runs differed in outcome or number of calls from the main run (benign 68/72 vs 70/72). We therefore compare D5/D6 against the D3 re-run from the same batch.
 
 ### Future Work
 
@@ -93,7 +118,7 @@ A6 (agents that rename or copy themselves to reset per-identity limits); an adap
 
 ## 6. Conclusion
 
-[[after results]]
+We built a reproducible A2A sandbox and tested how approval laundering and confused-deputy requests get past single-hop oversight. In 1110 pre-registered runs, three findings emerged. First, a gateway that tracks the task's provenance itself, instead of trusting sender metadata, removed externally injected payments, while a per-hop ACL gave no protection. Second, binding approvals to the exact action and showing that action to an LLM approver did not stop summary laundering, with either a small or a much larger approver model. Third, in exploratory runs, a single gateway-written warning that the payee is not a known vendor, or a hard allowlist, stopped every laundering and splitting attempt in our suite, at no measured cost to benign tasks. Next steps are adaptive attackers, measuring the cost of onboarding new vendors, and human approvers.
 
 ## Code and Data
 
@@ -115,7 +140,7 @@ A6 (agents that rename or copy themselves to reset per-identity limits); an adap
 
 ## Appendix A: Limitations and Dual-Use / Ethical Considerations (required)
 
-**What this does and does not establish.** [[fill after results]]. The results hold for one model family, scripted attackers and a mock organisation. They do not show that D3 stops adaptive attackers or attacks on the gateway itself.
+**What this does and does not establish.** The results establish the following for our sandbox. Gateway-tracked provenance blocks requests that enter a task from outside. LLM approvers approve laundered actions even when shown the exact action, unless a structural fact is stated explicitly. They do not establish robustness against adaptive attackers, against attackers who control a listed vendor, or against a compromised gateway. The results hold for one model family, scripted attackers and a mock organisation. They do not show that D3 stops adaptive attackers or attacks on the gateway itself.
 
 **Dual use.** The attack scenarios describe ways to get payments past approval steps in agent systems. The techniques (replaying approvals, paraphrasing for approvers, splitting below thresholds, forging relay claims) are well known from human fraud. They target only mock tools, and we publish them together with a defence and its measured cost. We do not release optimized jailbreak prompts; the scenario texts are plain business-English requests. The main risk is that our finding about which defences fail could guide attackers toward systems that use per-hop ACLs or per-message monitors. We judge that the benefit to defenders outweighs this.
 
