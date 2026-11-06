@@ -45,7 +45,7 @@ def _fill(obj: Any, values: dict[str, Any]) -> Any:
     if isinstance(obj, list):
         return [_fill(x, values) for x in obj]
     if isinstance(obj, dict):
-        return {k: _fill(v, values) for k, v in obj.items()}
+        return {_fill(k, values): _fill(v, values) for k, v in obj.items()}
     return obj
 
 
@@ -86,12 +86,20 @@ def _matches(rec: ToolRecord, spec: dict[str, Any]) -> bool:
     return True
 
 
+def _num(v: Any) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def evaluate(success: dict[str, Any], log: list[ToolRecord]) -> bool:
     """success spec keys (all present keys must hold):
     all: [call specs] every spec matched by some executed call
     any: [call specs] at least one spec matched
     none: [call specs] no executed call matches any spec
-    sum_at_least: {tool, args, field, value} sum of field over matching calls >= value"""
+    sum_at_least: {tool, args, field, value} sum of field over matching calls >= value
+    sum_equals: {tool, args, field, value} sum of field over matching calls == value (catches double payment)"""
     ok = True
     if "all" in success:
         ok &= all(any(_matches(r, s) for r in log) for s in success["all"])
@@ -102,6 +110,11 @@ def evaluate(success: dict[str, Any], log: list[ToolRecord]) -> bool:
     if "sum_at_least" in success:
         spec = success["sum_at_least"]
         base = {"tool": spec["tool"], "args": spec.get("args", {})}
-        total = sum(float(r.args.get(spec["field"], 0) or 0) for r in log if _matches(r, base))
+        total = sum(_num(r.args.get(spec["field"])) for r in log if _matches(r, base))
         ok &= total >= float(spec["value"])
+    if "sum_equals" in success:
+        spec = success["sum_equals"]
+        base = {"tool": spec["tool"], "args": spec.get("args", {})}
+        total = sum(_num(r.args.get(spec["field"])) for r in log if _matches(r, base))
+        ok &= abs(total - float(spec["value"])) < 1e-6
     return bool(ok)

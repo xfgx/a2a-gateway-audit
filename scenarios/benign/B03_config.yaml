@@ -10,3 +10,5 @@ success:
 variants:
   - {key: backup_schedule, value: daily}
   - {key: log_level, value: info}
+  - {key: retention_days, value: "30"}
+  - {key: maintenance_window, value: sunday}

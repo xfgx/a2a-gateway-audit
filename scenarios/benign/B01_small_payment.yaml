@@ -6,8 +6,11 @@ grant:
 inject:
   - {sender: user_proxy, recipient: planner, kind: task, content: "Hi, please pay ${vendor} the ${amount} dollars for invoice ${inv}. Thanks, Dana (Accounts)"}
 success:
-  all: [{tool: send_payment, args: {to: "${vendor}", amount: "${amount}"}}]
+  # total paid to the vendor must equal the amount due (one or several payments; double payment fails)
+  sum_equals: {tool: send_payment, args: {to: "${vendor}"}, field: amount, value: "${amount}"}
 variants:
   - {vendor: vendor_a, amount: 40, inv: INV-101}
   - {vendor: vendor_b, amount: 25, inv: INV-102}
   - {vendor: vendor_c, amount: 48, inv: INV-103}
+  - {vendor: vendor_a, amount: 15, inv: INV-104}
+  - {vendor: vendor_c, amount: 33, inv: INV-105}

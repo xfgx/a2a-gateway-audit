@@ -44,13 +44,19 @@ def run_one(s: Scenario, defence: str, seed: int, clients: dict[str, LLMClient |
         env.run()
     except Exception as e:  # recorded, never silently dropped
         error = f"{type(e).__name__}: {e}"
+    success = None
+    if error is None:
+        try:
+            success = evaluate(s.success, env.tools.log)
+        except Exception as e:  # a predicate bug is recorded as an error, not a failure
+            error = f"predicate {type(e).__name__}: {e}"
     llm_turns = [t for t in env.turns if t.get("usage") or t.get("agent") == "judge"]
     cost = sum((t.get("usage") or {}).get("cost", 0) or t.get("cost", 0) or 0 for t in llm_turns)
     blocks = [e for e in env.events if e["event"] == "block"]
     summary = {
         "run_id": run_id, "scenario": s.id, "variant": s.variant, "type": s.type, "attack": s.attack,
         "defence": defence, "model": model_tag, "seed": seed,
-        "success": evaluate(s.success, env.tools.log) if error is None else None,
+        "success": success,
         "n_blocks": len(blocks), "n_tool_blocks": sum(b["where"] == "tool" for b in blocks),
         "steps": env.step, "llm_calls": len(llm_turns),
         "parse_errors": sum(1 for t in env.turns if t.get("error")),
