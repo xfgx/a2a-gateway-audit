@@ -23,6 +23,7 @@ TOOL_OWNERS: dict[str, set[str]] = {
 }
 
 APPROVAL_THRESHOLD = 50.0  # payments above this need an approval
+KNOWN_VENDORS = ("vendor_a", "vendor_b", "vendor_c")  # the vendor master list named in the org policy
 
 
 def needs_approval(call: ToolCall) -> bool:

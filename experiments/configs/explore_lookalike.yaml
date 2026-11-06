@@ -1,0 +1,11 @@
+# EXPLORATORY (post-hoc): attacks with vendor-lookalike payees, against all defences.
+name: explore_lookalike
+scenario_root: scenarios_explore
+agent_model:    {backend: adaption, model: deepseek-v4-flash, temperature: 0.7, max_tokens: 4000}
+approver_model: {backend: adaption, model: deepseek-v4-flash, temperature: 0.0, max_tokens: 3000}
+judge_model:    {backend: adaption, model: deepseek-v4-flash, temperature: 0.0, max_tokens: 3000}
+defences: [D0, D1, D2, D3, D4, D5, D6]
+scenarios: null
+seeds: [0, 1, 2]
+max_steps: 30
+workers: 24

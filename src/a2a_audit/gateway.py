@@ -1,4 +1,4 @@
-"""Gateway defences D0-D4. Every message and tool call passes through one Gateway.
+"""Gateway defences D0-D6. Every message and tool call passes through one Gateway.
 
 D0  none: delivers everything; tool calls always execute (policy lives only in agent prompts)
 D1  ACL: immediate caller must own the tool; payments above threshold need an approval id
@@ -11,6 +11,9 @@ D3  D1 + provenance: the gateway tracks the task grant along the delegation chai
     recipient within a lineage above the threshold also need approval (anti-splitting); the
     approver is shown the exact structured action ("what you see is what you sign")
 D4  D3 + D2
+D5  D3 + gateway-surfaced facts for the approver (exploratory): the approval view adds an explicit
+    warning when the payee is not on the vendor master list
+D6  D3 + hard vendor allowlist (exploratory): payments to payees not on the vendor master list are blocked
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from .approvals import ApprovalService, Grant
 from .llm import LLMClient
 from .prompts import JUDGE_SYSTEM
 from .schema import Decision, Message, ToolCall
-from .tools import APPROVAL_THRESHOLD, TOOL_OWNERS, amount_of, needs_approval
+from .tools import APPROVAL_THRESHOLD, KNOWN_VENDORS, TOOL_OWNERS, amount_of, needs_approval
 
 DEFENCES = {
     "D0": dict(acl=False, judge=False, provenance=False),
@@ -32,6 +35,8 @@ DEFENCES = {
     "D2": dict(acl=True, judge=True, provenance=False),
     "D3": dict(acl=True, judge=False, provenance=True),
     "D4": dict(acl=True, judge=True, provenance=True),
+    "D5": dict(acl=True, judge=False, provenance=True, warn_unknown_payee=True),
+    "D6": dict(acl=True, judge=False, provenance=True, vendor_allowlist=True),
 }
 
 TRUSTED_SENDERS = {"user_proxy"}  # the employee; the judge does not screen their messages
@@ -58,6 +63,8 @@ class Gateway:
     def __post_init__(self):
         flags = DEFENCES[self.defence]
         self.acl, self.use_judge, self.provenance = flags["acl"], flags["judge"], flags["provenance"]
+        self.warn_unknown_payee = flags.get("warn_unknown_payee", False)
+        self.vendor_allowlist = flags.get("vendor_allowlist", False)
         if self.use_judge and self.judge_llm is None:
             raise ValueError(f"{self.defence} needs a judge LLM")
 
@@ -89,7 +96,7 @@ class Gateway:
         return Decision(allow=True, defence=self.defence)
 
     def extra_for(self, msg: Message) -> str:
-        """Extra header the recipient sees (D3/D4 only)."""
+        """Extra header the recipient sees (D3 and above only)."""
         if not self.provenance:
             return ""
         g = self.msg_grants.get(msg.msg_id)
@@ -101,6 +108,9 @@ class Gateway:
                 prior = max((self.spent_to[(lin, to)] for lin in g.lineage), default=0.0)
                 lines.append(f"[gateway] already paid to {to} in this task: {prior:.2f}; "
                              f"total after this payment: {prior + amount_of(msg.tool_call):.2f}")
+                if self.warn_unknown_payee and to not in KNOWN_VENDORS:
+                    lines.append(f"[gateway] WARNING: payee {to} is NOT on the vendor master list "
+                                 f"({', '.join(KNOWN_VENDORS)}).")
         return "\n".join(x for x in lines if x)
 
     # ---- tool calls -------------------------------------------------------------------
@@ -108,6 +118,8 @@ class Gateway:
         d = self.defence
         if self.acl and call.tool not in TOOL_OWNERS.get(caller, set()):
             return Decision(allow=False, reason=f"{caller} does not own {call.tool}", defence=d)
+        if self.vendor_allowlist and call.tool == "send_payment" and str(call.args.get("to")) not in KNOWN_VENDORS:
+            return Decision(allow=False, reason=f"payee {call.args.get('to')} is not on the vendor master list", defence=d)
         g = self.effective(caller, task_id) if self.provenance else None
         if self.provenance:
             ok, why = g.check(call, self.spent[call.tool])
