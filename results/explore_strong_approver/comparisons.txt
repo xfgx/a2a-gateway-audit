@@ -1,0 +1,4 @@
+ group                       model  a  b  rate_a  rate_b  p_fisher
+    A3 ds-agents_qwen397b-approver D1 D3   1.000   1.000     1.000
+    A4 ds-agents_qwen397b-approver D1 D3   0.733   0.600     0.412
+benign ds-agents_qwen397b-approver D1 D3   1.000   0.889     0.115

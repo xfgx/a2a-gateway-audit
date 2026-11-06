@@ -4,7 +4,7 @@ import pytest
 
 from a2a_audit.a2a_wire import from_a2a, to_a2a
 from a2a_audit.agents import parse_actions
-from a2a_audit.analyze import fisher_exact, wilson
+from a2a_audit.analyze import fisher_exact, holm, newcombe_diff, wilson
 from a2a_audit.approvals import Grant
 from a2a_audit.bus import Environment
 from a2a_audit.sandbox import SandboxViolation, network_allowlist
@@ -68,6 +68,12 @@ def test_sum_equals_catches_double_payment():
     assert evaluate(spec, [rec(65)])
     assert not evaluate(spec, [rec(65), rec(65)])
     assert not evaluate(spec, [rec(30)])
+
+
+def test_holm_and_newcombe():
+    assert holm([0.01, 0.04, 0.03]) == [0.03, 0.06, 0.06]
+    d, lo, hi = newcombe_diff(56, 70, 48, 80)  # Newcombe (1998) example: 0.2, CI 0.0524-0.3339
+    assert abs(d - 0.2) < 1e-9 and abs(lo - 0.0524) < 1e-3 and abs(hi - 0.3339) < 1e-3
 
 
 def test_wilson():
