@@ -9,3 +9,4 @@ results/tmp/
 .cache/
 .DS_Store
 uv.lock
+results/smoke*/
